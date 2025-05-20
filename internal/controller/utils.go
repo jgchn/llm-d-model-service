@@ -102,7 +102,6 @@ func mountedModelPath(modelService *msv1alpha1.ModelService) (string, error) {
 		// The mountModelPath for HF is just the storage root, ie. model-cache
 		mountedModelPath = modelStorageRoot
 
-	// TODO
 	// case OCI:
 
 	case UnknownURI:
@@ -187,6 +186,38 @@ func parseHFURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, string, error
 	}
 
 	return parts[0], parts[1], nil
+}
+
+// parseOCIURI returns parts from a valid oci URI, or
+// returns an error if the OCI URI is invalid
+// returns two strings
+// First string is the complete image identifier including tag
+// Second string is the path to the model
+func parseOCIURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, string, error) {
+	var imageIdentifier string
+	var pathToModel string
+	if modelArtifact == nil {
+		return imageIdentifier, pathToModel, fmt.Errorf("modelArtifact is nil")
+	}
+
+	uri := modelArtifact.URI
+	if !isOCIURI(uri) {
+		return imageIdentifier, pathToModel, fmt.Errorf("URI does not have oci prefix: %s", uri)
+	}
+
+	parts := strings.Split(strings.TrimPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX), pathSep)
+	if len(parts) != 2 {
+		return imageIdentifier, pathToModel, fmt.Errorf("invalid oci URI format: %s; need oci://<image identifier with tag>::/path/to/model", uri)
+	}
+	
+	imageIdentifier = parts[0]
+	if !(strings.HasPrefix(parts[1], ociPathToModelSep)) {
+		return imageIdentifier, pathToModel, fmt.Errorf("invalid oci URI format: %s; need oci://<image identifier with tag>::/path/to/model", uri)
+	}
+	
+	pathToModel = strings.TrimPrefix(parts[1], ociPathToModelSep)
+	
+	return imageIdentifier, pathToModel, nil
 }
 
 // getVolumeMountForContainer returns a VolumeMount for a container where MountModelVolume: true
