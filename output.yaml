@@ -1,0 +1,297 @@
+decodeDeployment:
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    creationTimestamp: null
+    labels:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: llama-2075
+      llm-d.ai/role: decode
+    name: busybox-decode
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: llama-2075
+        llm-d.ai/role: decode
+    strategy: {}
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          llm-d.ai/inferenceServing: "true"
+          llm-d.ai/model: llama-2075
+          llm-d.ai/role: decode
+      spec:
+        affinity: {}
+        containers:
+        - args:
+          - llama-2075
+          command:
+          - sleep
+          image: busybox
+          name: llm
+          resources: {}
+        initContainers:
+        - args:
+          - ""
+          image: busybox
+          name: proxy
+          resources: {}
+          volumeMounts:
+          - mountPath: /model-cache
+            name: model-storage
+            readOnly: true
+        serviceAccountName: busybox-sa
+        volumes:
+        - image:
+            reference: redhat/granite-7b-lab-gguf:1.0
+          name: model-storage
+  status: {}
+decodeService:
+  apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    name: busybox-service-decode
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 9376
+    selector:
+      app.kubernetes.io/name: decodeServiceLabelInBaseConfig
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: llama-2075
+      llm-d.ai/role: decode
+  status:
+    loadBalancer: {}
+eppDeployment:
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    creationTimestamp: null
+    labels:
+      llm-d.ai/epp: busybox-epp
+    name: busybox-epp
+    namespace: default
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        llm-d.ai/epp: busybox-epp
+    strategy: {}
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          llm-d.ai/epp: busybox-epp
+      spec:
+        containers:
+        - args:
+          - -poolName
+          - my-pool-name
+          - -poolNamespace
+          - my-pool-namespace
+          - -v
+          - "4"
+          - --zap-encoder
+          - json
+          - -grpcPort
+          - "9002"
+          - -grpcHealthPort
+          - "9003"
+          env:
+          - name: USE_STREAMING
+            value: "false"
+          - name: HF_TOKEN
+            value: hello
+          image: us-central1-docker.pkg.dev/k8s-staging-images/gateway-api-inference-extension/epp:main
+          imagePullPolicy: Always
+          livenessProbe:
+            grpc:
+              port: 9003
+              service: inference-extension
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          name: epp
+          ports:
+          - containerPort: 9002
+          - containerPort: 9003
+          - containerPort: 9090
+            name: metrics
+          readinessProbe:
+            grpc:
+              port: 9003
+              service: inference-extension
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources: {}
+        serviceAccountName: busybox-epp-sa
+        terminationGracePeriodSeconds: 130
+  status: {}
+eppRoleBinding:
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: null
+    name: busybox-epp-rolebinding
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: pod-read
+  subjects:
+  - kind: ServiceAccount
+    name: busybox-epp-sa
+eppService:
+  apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
+      llm-d.ai/epp: busybox-epp
+    name: busybox-epp-service
+    namespace: default
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  spec:
+    ports:
+    - appProtocol: http2
+      port: 9002
+      protocol: TCP
+      targetPort: 9002
+    selector:
+      app: llm-llama3-8b-instruct-epp
+      llm-d.ai/epp: busybox-epp
+  status:
+    loadBalancer: {}
+eppServiceAccount:
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    creationTimestamp: null
+    name: busybox-epp-sa
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+httpRoute:
+  apiVersion: gateway.networking.k8s.io/v1
+  kind: HTTPRoute
+  metadata:
+    creationTimestamp: null
+    name: busybox-http-route
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  spec:
+    parentRefs:
+    - name: inference-gateway-name
+      port: 1112
+    rules:
+    - matches:
+      - path:
+          type: PathPrefix
+          value: /
+    - backendRefs:
+      - group: inference.networking.x-k8s.io
+        kind: InferencePool
+        name: busybox-inference-pool
+        port: 9376
+    - backendRefs:
+      - group: inference.networking.x-k8s.io
+        kind: InferencePool
+        name: busybox-inference-pool
+  status:
+    parents: null
+inferenceModel:
+  apiVersion: inference.networking.x-k8s.io/v1alpha2
+  kind: InferenceModel
+  metadata:
+    creationTimestamp: null
+    labels:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: llama-2075
+    name: busybox
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  spec:
+    criticality: Standard
+    modelName: llama-2075
+    poolRef:
+      name: busybox-inference-pool
+  status: {}
+inferencePool:
+  apiVersion: inference.networking.x-k8s.io/v1alpha2
+  kind: InferencePool
+  metadata:
+    creationTimestamp: null
+    name: busybox-inference-pool
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+  spec:
+    extensionRef:
+      failureMode: null
+      name: busybox-epp-service
+    selector:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: llama-2075
+    targetPortNumber: 9376
+  status: {}
+pdServiceAccount:
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    creationTimestamp: null
+    name: busybox-sa
+    ownerReferences:
+    - apiVersion: llm-d.ai/v1alpha1
+      kind: ModelService
+      name: busybox
+      uid: ""
+prefillService:
+  metadata:
+    creationTimestamp: null
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 9376
+    selector:
+      app.kubernetes.io/name: prefillServiceLabelInBaseConfig
+  status:
+    loadBalancer: {}
+

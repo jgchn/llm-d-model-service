@@ -1,5 +1,5 @@
-# A universal baseconfig for models that can be downloaded from Hugging Face
-
+# A universal baseconfig for models stored on PVCs
+#
 # Requirements:
 # Any consuming ModelService should define ports labeled:
 #    - app_port - the external port number for the prefill and decode pods
@@ -8,7 +8,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: universal-base-config-hf
-immutable: true
+immutable: false
 data:
   decodeDeployment: |
     apiVersion: apps/v1
@@ -53,8 +53,6 @@ data:
                   value: "0"
                 - name: UCX_TLS
                   value: "cuda_ipc,cuda_copy,tcp"
-                - name: HF_HOME
-                  value: /model-cache
                 - name: VLLM_NIXL_SIDE_CHANNEL_HOST
                   valueFrom:
                     fieldRef:
@@ -76,10 +74,6 @@ data:
                   cpu: "16"
                   memory: 16Gi
                   nvidia.com/gpu: 1
-          volumes:
-            - name: model-storage
-              emptyDir:
-                sizeLimit: 20Gi
 
   prefillDeployment: |
     apiVersion: apps/v1
@@ -115,8 +109,6 @@ data:
                       fieldPath: status.podIP
                 - name: VLLM_LOGGING_LEVEL
                   value: DEBUG
-                - name: HF_HOME
-                  value: /model-cache
               ports:
                 - containerPort: {{ "app_port" | getPort }}
                   protocol: TCP
@@ -132,11 +124,7 @@ data:
                   cpu: "16"
                   memory: 16Gi
                   nvidia.com/gpu: 1
-          volumes:
-            - name: model-storage
-              emptyDir:
-                sizeLimit: 20Gi
-  
+
   eppService: |
     apiVersion: v1
     kind: Service
@@ -176,7 +164,7 @@ data:
                   value: "true"
                 - name: PD_PROMPT_LEN_THRESHOLD
                   value: "10"
-              image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
+              image: ghcr.io/llm-d/llm-d-inference-scheduler:v0.1.0
               livenessProbe:
                 failureThreshold: 3
                 grpc:
@@ -220,3 +208,29 @@ data:
           kind: InferencePool
           name: {{ .InferencePoolName }}
           port: {{ "app_port" | getPort }}
+        matches:
+        - headers:
+          - name: x-model-name
+            type: Exact
+            value: {{ .HFModelName }}
+          path:
+            type: PathPrefix
+            value: /
+        
+  # rules:
+  # - matches:
+  #   - headers:
+  #     - type: Exact
+  #       name: x-model-name
+  #       value: {{ .HFModelName }}
+  #   backendRefs:
+  #   - name: {{ .InferencePoolName }}
+  #     kind: InferencePool
+  #     group: inference.networking.x-k8s.io
+  #     port: {{ "app_port" | getPort }}
+  #     - filters:
+  #       - type: RequestHeaderModifier
+  #         requestHeaderModifier:
+  #           set:
+  #           - name: x-model-name
+  #             value: {{ .HFModelName }}

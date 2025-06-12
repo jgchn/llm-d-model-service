@@ -102,3 +102,29 @@ Various template variable are exposed as a result of using the `"pvc://"` prefix
 ### 3. Loading the model from an image volume
 
 NotImplemented.
+
+
+curl http://localhost:8000/v1/completions -vvv \
+    -H "Content-Type: application/json" \
+    -d '{
+    "model": "facebook/opt-125m",
+    "prompt": "Hello, "
+}' 
+
+curl http://localhost:8000/v1/completions -vvv \
+    -H "Content-Type: application/json" \
+    -H "x-model-name: facebook/opt-125m" \
+    -d '{
+    "model": "facebook/opt-125m",
+    "prompt": "Hello, "
+}' 
+
+--- 
+
+curl http://localhost:8000/v1/completions -vvv \
+    -H "Content-Type: application/json" \
+    -H "x-model-name: ibm-granite/granite-3.3-2b-base" \
+    -d '{
+    "model": "ibm-granite/granite-3.3-2b-base",
+    "prompt": "Hello, "
+}' 

@@ -1,0 +1,65 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  generateName: facebook-opt-125m-nixl-epp-58bbc8457d-
+  name: facebook-opt-125m-nixl-epp-58bbc8457d-dxznn
+  namespace: e2e-solution
+  labels:
+    llm-d.ai/epp: facebook-opt-125m-nixl-epp
+spec:
+  serviceAccountName: facebook-opt-125m-nixl-epp-sa
+  containers:
+    - resources: {}
+      readinessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      terminationMessagePath: /dev/termination-log
+      name: epp
+      livenessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      env:
+        - name: PD_ENABLED
+          value: 'true'
+        - name: PD_PROMPT_LEN_THRESHOLD
+          value: '10'
+      securityContext:
+        capabilities:
+          drop:
+            - MKNOD
+      ports:
+        - containerPort: 9002
+          protocol: TCP
+        - containerPort: 9003
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+      imagePullPolicy: IfNotPresent
+      image: 'ghcr.io/llm-d/llm-d-inference-scheduler:v0.1.0'
+      args:
+        - '-poolName'
+        - facebook-opt-125m-nixl-inference-pool
+        - '-poolNamespace'
+        - e2e-solution
+        - '-v'
+        - '6'
+        - '--zap-encoder'
+        - json
+        - '-grpcPort'
+        - '9002'
+        - '-grpcHealthPort'
+        - '9003'
+  serviceAccount: facebook-opt-125m-nixl-epp-sa

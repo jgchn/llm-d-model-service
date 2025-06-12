@@ -16,6 +16,10 @@ spec:
       port: 8000
     - name: internal_port
       port: 8200
+    gatewayRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: inference-gateway-bad
 
   modelArtifacts:
     # When specfying the URI with `hf` prefix, the <repo-id>/<model-id> string

@@ -1,0 +1,44 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  name: granite-base-model
+spec:
+  decoupleScaling: false
+
+  baseConfigMapRef:
+    name: universal-base-config-hf
+
+  routing: 
+    # This is the model name for the OpenAI request
+    modelName: ibm-granite/granite-3.3-2b-base
+    ports:
+    - name: app_port
+      port: 8000
+    - name: internal_port
+      port: 8200
+    gatewayRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: inference-gateway-kgateway
+
+  modelArtifacts:
+    # When specfying the URI with `hf` prefix, the <repo-id>/<model-id> string
+    # is extracted and exposed as a template variable that can be used as {{ .HFModelName }}
+    uri: hf://ibm-granite/granite-3.3-2b-base
+
+  # decode pods
+  decode:
+    replicas: 1
+    containers:
+    - name: "vllm"
+      args:
+        - "{{ .HFModelName }}"
+  
+  # the prefill pods
+  prefill:
+    replicas: 1
+    containers:
+      - name: "vllm"
+        args:
+          - "{{ .HFModelName }}"
+      

@@ -1,0 +1,24 @@
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferencePool
+metadata:
+  creationTimestamp: "2025-06-09T15:29:28Z"
+  generation: 1
+  name: granite-base-model-inference-pool
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: granite-base-model
+    uid: 1d05a267-5613-4c6b-aab3-1033d8af8836
+  resourceVersion: "318198999"
+  uid: b2da2241-0dfe-41d1-a0c1-4a142447cf6f
+spec:
+  extensionRef:
+    failureMode: FailClose
+    group: ""
+    kind: Service
+    name: granite-base-model-epp-service
+  selector:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: ibm-granite-granite-3-3-2b-base
+  targetPortNumber: 8000

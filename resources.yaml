@@ -1,0 +1,466 @@
+# InferenceGateway
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: GatewayParameters
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"gateway.kgateway.dev/v1alpha1","kind":"GatewayParameters","metadata":{"annotations":{},"name":"inference-gateway-params","namespace":"e2e-solution"},"spec":{"kube":{"service":{"type":"ClusterIP"}}}}
+  creationTimestamp: "2025-05-28T14:30:23Z"
+  generation: 1
+  name: inference-gateway-params
+  namespace: e2e-solution
+  resourceVersion: "289548088"
+  uid: 07b763ce-91c0-49b6-9364-129c8214ccf8
+spec:
+  kube:
+    service:
+      type: ClusterIP
+--- 
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: inference-gateway-kgateway
+spec:
+  gatewayClassName: kgateway
+  infrastructure:
+    parametersRef:
+      group: gateway.kgateway.dev
+      kind: GatewayParameters
+      name: inference-gateway-params
+  listeners:
+  - allowedRoutes:
+      namespaces:
+        from: Same
+    name: http
+    port: 80
+    protocol: HTTP
+---
+# HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  creationTimestamp: "2025-06-09T15:51:03Z"
+  generation: 1
+  name: facebook-opt-125m-nixl-http-route
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: facebook-opt-125m-nixl
+    uid: 50ff5072-5c42-46f9-930c-39b0cdf5f129
+  resourceVersion: "318234091"
+  uid: 24af964a-447c-4a48-96a6-3027bf4767ff
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: inference-gateway
+  rules:
+  - backendRefs:
+    - group: inference.networking.x-k8s.io
+      kind: InferencePool
+      name: facebook-opt-125m-nixl-inference-pool
+      port: 8000
+      weight: 1
+    matches:
+    - headers:
+      - name: x-model-name
+        type: Exact
+        value: facebook/opt-125m
+      path:
+        type: PathPrefix
+        value: /
+status:
+  parents: []
+--- 
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  creationTimestamp: "2025-06-09T15:29:28Z"
+  generation: 2
+  name: granite-base-model-http-route
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: granite-base-model
+    uid: 1d05a267-5613-4c6b-aab3-1033d8af8836
+  resourceVersion: "318227201"
+  uid: 0f3f4164-a3c4-498f-bbe3-5f70471235bb
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: inference-gateway
+  rules:
+  - backendRefs:
+    - group: inference.networking.x-k8s.io
+      kind: InferencePool
+      name: granite-base-model-inference-pool
+      port: 8000
+      weight: 1
+    matches:
+    - headers:
+      - name: x-model-name
+        type: Exact
+        value: ibm-granite/granite-3.3-2b-base
+      path:
+        type: PathPrefix
+        value: /
+status:
+  parents:
+  - conditions:
+    - lastTransitionTime: "2025-06-09T15:46:54Z"
+      message: ""
+      observedGeneration: 2
+      reason: Accepted
+      status: "True"
+      type: Accepted
+    - lastTransitionTime: "2025-06-09T15:46:54Z"
+      message: ""
+      observedGeneration: 2
+      reason: ResolvedRefs
+      status: "True"
+      type: ResolvedRefs
+    controllerName: kgateway.dev/kgateway
+    parentRef:
+      group: gateway.networking.k8s.io
+      kind: Gateway
+      name: inference-gateway
+
+--- 
+# InferencePool
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferencePool
+metadata:
+  creationTimestamp: "2025-06-09T15:48:42Z"
+  generation: 1
+  name: facebook-opt-125m-nixl-inference-pool
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: facebook-opt-125m-nixl
+    uid: 50ff5072-5c42-46f9-930c-39b0cdf5f129
+  resourceVersion: "318230259"
+  uid: 3a695ed3-9b15-46de-a16f-642ca1609446
+spec:
+  extensionRef:
+    failureMode: FailClose
+    group: ""
+    kind: Service
+    name: facebook-opt-125m-nixl-epp-service
+  selector:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: facebook-opt-125m
+  targetPortNumber: 8000
+
+--- 
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferencePool
+metadata:
+  creationTimestamp: "2025-06-09T15:29:28Z"
+  generation: 1
+  name: granite-base-model-inference-pool
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: granite-base-model
+    uid: 1d05a267-5613-4c6b-aab3-1033d8af8836
+  resourceVersion: "318198999"
+  uid: b2da2241-0dfe-41d1-a0c1-4a142447cf6f
+spec:
+  extensionRef:
+    failureMode: FailClose
+    group: ""
+    kind: Service
+    name: granite-base-model-epp-service
+  selector:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: ibm-granite-granite-3-3-2b-base
+  targetPortNumber: 8000
+
+---  
+# InferenceModel
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferenceModel
+metadata:
+  creationTimestamp: "2025-06-09T15:48:42Z"
+  generation: 1
+  labels:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: facebook-opt-125m
+  name: facebook-opt-125m-nixl
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: facebook-opt-125m-nixl
+    uid: 50ff5072-5c42-46f9-930c-39b0cdf5f129
+  resourceVersion: "318230264"
+  uid: 37e80c2b-0d60-4e30-90f2-d6ae18ff2932
+spec:
+  modelName: facebook/opt-125m
+  poolRef:
+    group: inference.networking.x-k8s.io
+    kind: InferencePool
+    name: facebook-opt-125m-nixl-inference-pool
+
+
+---  
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferenceModel
+metadata:
+  creationTimestamp: "2025-06-09T15:29:28Z"
+  generation: 1
+  labels:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: ibm-granite-granite-3-3-2b-base
+  name: granite-base-model
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: granite-base-model
+    uid: 1d05a267-5613-4c6b-aab3-1033d8af8836
+  resourceVersion: "318199006"
+  uid: ac85f3fa-907f-475b-aa68-01c74987adad
+spec:
+  modelName: ibm-granite/granite-3.3-2b-base
+  poolRef:
+    group: inference.networking.x-k8s.io
+    kind: InferencePool
+    name: granite-base-model-inference-pool
+
+---  
+# Epp Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2025-06-09T15:48:41Z"
+  generation: 1
+  labels:
+    llm-d.ai/epp: facebook-opt-125m-nixl-epp
+  name: facebook-opt-125m-nixl-epp
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: facebook-opt-125m-nixl
+    uid: 50ff5072-5c42-46f9-930c-39b0cdf5f129
+  resourceVersion: "318230574"
+  uid: f6b9ade8-c603-480a-beac-772d528014c8
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      llm-d.ai/epp: facebook-opt-125m-nixl-epp
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        llm-d.ai/epp: facebook-opt-125m-nixl-epp
+    spec:
+      containers:
+      - args:
+        - -poolName
+        - facebook-opt-125m-nixl-inference-pool
+        - -poolNamespace
+        - e2e-solution
+        - serverless-workstream
+        - -v
+        - "4"
+        - --zap-encoder
+        - json
+        - -grpcPort
+        - "9002"
+        - -grpcHealthPort
+        - "9003"
+        env:
+        - name: PD_ENABLED
+          value: "true"
+        - name: PD_PROMPT_LEN_THRESHOLD
+          value: "10"
+        image: ghcr.io/llm-d/llm-d-inference-scheduler:v0.1.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: envoy.service.ext_proc.v3.ExternalProcessor
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: epp
+        ports:
+        - containerPort: 9002
+          protocol: TCP
+        - containerPort: 9003
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: envoy.service.ext_proc.v3.ExternalProcessor
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: facebook-opt-125m-nixl-epp-sa
+      serviceAccountName: facebook-opt-125m-nixl-epp-sa
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2025-06-09T15:48:52Z"
+    lastUpdateTime: "2025-06-09T15:48:52Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-06-09T15:48:41Z"
+    lastUpdateTime: "2025-06-09T15:48:52Z"
+    message: ReplicaSet "facebook-opt-125m-nixl-epp-76c6876c76" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---  
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2025-06-09T15:29:28Z"
+  generation: 1
+  labels:
+    llm-d.ai/epp: granite-base-model-epp
+  name: granite-base-model-epp
+  namespace: e2e-solution
+  ownerReferences:
+  - apiVersion: llm-d.ai/v1alpha1
+    kind: ModelService
+    name: granite-base-model
+    uid: 1d05a267-5613-4c6b-aab3-1033d8af8836
+  resourceVersion: "318199359"
+  uid: ed7a8fea-eb81-4aeb-9b06-0f0e2d5e49d2
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      llm-d.ai/epp: granite-base-model-epp
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        llm-d.ai/epp: granite-base-model-epp
+    spec:
+      containers:
+      - args:
+        - -poolName
+        - granite-base-model-inference-pool
+        - -poolNamespace
+        - e2e-solution
+        - serverless-workstream
+        - -v
+        - "4"
+        - --zap-encoder
+        - json
+        - -grpcPort
+        - "9002"
+        - -grpcHealthPort
+        - "9003"
+        env:
+        - name: PD_ENABLED
+          value: "true"
+        - name: PD_PROMPT_LEN_THRESHOLD
+          value: "10"
+        image: ghcr.io/llm-d/llm-d-inference-scheduler:v0.1.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: envoy.service.ext_proc.v3.ExternalProcessor
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: epp
+        ports:
+        - containerPort: 9002
+          protocol: TCP
+        - containerPort: 9003
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: envoy.service.ext_proc.v3.ExternalProcessor
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: granite-base-model-epp-sa
+      serviceAccountName: granite-base-model-epp-sa
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2025-06-09T15:29:39Z"
+    lastUpdateTime: "2025-06-09T15:29:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-06-09T15:29:28Z"
+    lastUpdateTime: "2025-06-09T15:29:39Z"
+    message: ReplicaSet "granite-base-model-epp-7c9f8df9cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1

@@ -20,29 +20,25 @@ spec:
       port: 1112
 
   modelArtifacts:
-    uri: pvc://llama-of-the-future/path/to/llama-2075
+    uri: hf://facebook/opt-125m
 
   # describe decode pods
-  decode:
+  prefill:
     replicas: 1
-    initContainers:
-    - name: "proxy"
-      image: "busybox"
-      args: 
-      - "{{ .ModelPath }}"
-      mountModelVolume: true 
-      
     containers:
     - name: "llm"
       image: busybox
-      args:
-      - "{{ .ModelName }}"
+      args: 
+      - "sleep"
+      - "3600"
+      # args:
+      # - "{{ .ModelName }}"
 
-  endpointPicker:
-    containers:
-    - name: "epp"
-      env:
-      - name: HF_TOKEN
-        value: hello
-      - name: USE_STREAMING
-        value: "false"
+  # endpointPicker:
+  #   containers:
+  #   - name: "epp"
+  #     env:
+  #     - name: HF_TOKEN
+  #       value: hello
+  #     - name: USE_STREAMING
+  #       value: "false"
